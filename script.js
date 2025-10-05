@@ -83,15 +83,21 @@ async function fetchVideos(identifier, limit=4, page=1) {
 // Trending
 async function showTrending() {
     trendingSection.innerHTML = "";
-    const trendingVideos = await fetchVideos(categories.home[0], 6);
-    trendingVideos.forEach(video => trendingSection.appendChild(createVideoCard(video)));
+    try {
+        const trendingVideos = await fetchVideos(categories.home[0], 6);
+        trendingVideos.forEach(video => trendingSection.appendChild(createVideoCard(video)));
+    } catch(err) {
+        console.error("Error showing trending videos:", err);
+    }
 }
 
 // Home videos with descriptions and ads
 async function showHome() {
     homeSection.innerHTML = "";
+
     for (let cat in categories) {
         if(cat === "home") continue;
+
         let catLinks = categories[cat];
         if(!Array.isArray(catLinks)) catLinks = [catLinks];
 
@@ -100,8 +106,8 @@ async function showHome() {
         header.textContent = cat.toUpperCase();
         homeSection.appendChild(header);
 
-        // Category description
-        if(categoryDescriptions[cat]){
+        // Category description (safe check)
+        if(categoryDescriptions[cat]) {
             const desc = document.createElement("p");
             desc.style.fontSize = "0.9em";
             desc.style.color = "#555";
@@ -114,25 +120,30 @@ async function showHome() {
         homeSection.appendChild(grid);
 
         let videoCount = 0; // Counter for ad insertion
-        for(const link of catLinks){
-            const videos = await fetchVideos(link, 4);
-            videos.forEach(v => {
-                grid.appendChild(createVideoCard(v));
-                videoCount++;
 
-                // Insert AdSense after every 4 videos
-                if(videoCount % 4 === 0){
-                    const ad = document.createElement("ins");
-                    ad.className = "adsbygoogle";
-                    ad.style.display = "block";
-                    ad.setAttribute("data-ad-client", "ca-pub-3798659133542290");
-                    ad.setAttribute("data-ad-slot", "9086965876");
-                    ad.setAttribute("data-ad-format", "auto");
-                    ad.setAttribute("data-full-width-responsive", "true");
-                    grid.appendChild(ad);
-                    (adsbygoogle = window.adsbygoogle || []).push({});
-                }
-            });
+        for(const link of catLinks){
+            try {
+                const videos = await fetchVideos(link, 4);
+                videos.forEach(v => {
+                    grid.appendChild(createVideoCard(v));
+                    videoCount++;
+
+                    // Insert AdSense ad every 4 videos
+                    if(videoCount % 4 === 0){
+                        const ad = document.createElement("ins");
+                        ad.className = "adsbygoogle";
+                        ad.style.display = "block";
+                        ad.setAttribute("data-ad-client", "ca-pub-3798659133542290");
+                        ad.setAttribute("data-ad-slot", "9086965876");
+                        ad.setAttribute("data-ad-format", "auto");
+                        ad.setAttribute("data-full-width-responsive", "true");
+                        grid.appendChild(ad);
+                        (adsbygoogle = window.adsbygoogle || []).push({});
+                    }
+                });
+            } catch(err) {
+                console.error(`Error loading videos for ${link}:`, err);
+            }
         }
     }
 }
@@ -153,37 +164,122 @@ async function showCategory(category) {
     async function loadVideos() {
         if(loading) return;
         loading = true;
+
         for(const link of catLinks){
-            let videos = await fetchVideos(link, 10, page);
+            try {
+                let videos = await fetchVideos(link, 10, page);
 
-            if(category === "sports") {
-                videos.sort((a, b) => {
-                    const yearA = parseInt((a.title.match(/\d{4}/) || [0])[0]);
-                    const yearB = parseInt((b.title.match(/\d{4}/) || [0])[0]);
-                    if(yearB !== yearA) return yearB - yearA;
-                    return a.title.localeCompare(b.title);
+                if(category === "sports") {
+                    videos.sort((a, b) => {
+                        const yearA = parseInt((a.title.match(/\d{4}/) || [0])[0]);
+                        const yearB = parseInt((b.title.match(/\d{4}/) || [0])[0]);
+                        if(yearB !== yearA) return yearB - yearA;
+                        return a.title.localeCompare(b.title);
+                    });
+                } else if(category === "sportstelevision") {
+                    videos.sort((a, b) => {
+                        const titleA = a.title.toLowerCase();
+                        const titleB = b.title.toLowerCase();
+                        const yearA = parseInt((a.title.match(/\d{4}/) || [0])[0]);
+                        const yearB = parseInt((b.title.match(/\d{4}/) || [0])[0]);
+
+                        if(titleA.includes("football") && !titleB.includes("football")) return -1;
+                        if(!titleA.includes("football") && titleB.includes("football")) return 1;
+
+                        if(yearB !== yearA) return yearB - yearA;
+                        return titleA.localeCompare(titleB);
+                    });
+                }
+
+                videos.forEach(v => {
+                    grid.appendChild(createVideoCard(v));
+                    videoCount++;
+
+                    if(videoCount % 4 === 0){
+                        const ad = document.createElement("ins");
+                        ad.className = "adsbygoogle";
+                        ad.style.display = "block";
+                        ad.setAttribute("data-ad-client", "ca-pub-3798659133542290");
+                        ad.setAttribute("data-ad-slot", "9086965876");
+                        ad.setAttribute("data-ad-format", "auto");
+                        ad.setAttribute("data-full-width-responsive", "true");
+                        grid.appendChild(ad);
+                        (adsbygoogle = window.adsbygoogle || []).push({});
+                    }
                 });
-            } else if(category === "sportstelevision") {
-                videos.sort((a, b) => {
-                    const titleA = a.title.toLowerCase();
-                    const titleB = b.title.toLowerCase();
-                    const yearA = parseInt((a.title.match(/\d{4}/) || [0])[0]);
-                    const yearB = parseInt((b.title.match(/\d{4}/) || [0])[0]);
-
-                    if(titleA.includes("football") && !titleB.includes("football")) return -1;
-                    if(!titleA.includes("football") && titleB.includes("football")) return 1;
-
-                    if(yearB !== yearA) return yearB - yearA;
-                    return titleA.localeCompare(titleB);
-                });
+            } catch(err) {
+                console.error(`Error loading videos for ${link}:`, err);
             }
+        }
 
-            videos.forEach(v => {
-                grid.appendChild(createVideoCard(v));
-                videoCount++;
+        page++;
+        loading = false;
+    }
 
-                if(videoCount % 4 === 0){
-                    const ad = document.createElement("ins");
-                    ad.className = "adsbygoogle";
-                    ad.style.display = "block";
-                    ad.setAttribute("
+    await loadVideos();
+
+    window.onscroll = async () => {
+        if(window.innerHeight + window.scrollY >= document.body.offsetHeight - 2) {
+            await loadVideos();
+        }
+    }
+}
+
+// Nav bar
+document.querySelectorAll(".nav-links li").forEach(li => {
+    li.addEventListener("click", async () => {
+        document.querySelectorAll(".nav-links li").forEach(x => x.classList.remove("active"));
+        li.classList.add("active");
+        currentCategory = li.dataset.category;
+        if(currentCategory === "home"){
+            categorySection.innerHTML = "";
+            await showHome();
+        } else {
+            homeSection.innerHTML = "";
+            await showCategory(currentCategory);
+        }
+    });
+});
+
+// Search form
+document.getElementById("searchForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const query = document.getElementById("searchInput").value.toLowerCase();
+    categorySection.innerHTML = "";
+
+    const loading = document.createElement("p");
+    loading.textContent = "Searching...";
+    loading.style.textAlign = "center";
+    loading.style.fontWeight = "bold";
+    categorySection.appendChild(loading);
+
+    const grid = document.createElement("div");
+    grid.className = "video-grid";
+
+    try {
+        let allVideos = [];
+
+        for (const cat of categories.home) {
+            const videos = await fetchVideos(cat, 20);
+            allVideos = allVideos.concat(videos);
+        }
+
+        const res = await fetch(
+            `https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,year,rights&sort[]=year+desc&rows=20&page=1&output=json`
+        );
+        const data = await res.json();
+        if(data.response.docs) {
+            const archiveVideos = data.response.docs.map(v => ({
+                title: v.title,
+                url: `https://archive.org/details/${v.identifier}`,
+                rights: v.rights || "Unknown",
+                thumbnail: `https://archive.org/services/get-item-image.php?identifier=${v.identifier}&mediatype=movies&thumb=1`
+            }));
+            allVideos = allVideos.concat(archiveVideos);
+        }
+
+        const unique = {};
+        const filtered = allVideos.filter(v => {
+            const key = v.title.toLowerCase().trim();
+            if (unique[key]) return false;
+            unique[key] = true;
