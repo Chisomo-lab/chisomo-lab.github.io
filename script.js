@@ -15,6 +15,16 @@ const categories = {
     sportstelevision: "sportstelevision"
 };
 
+// Category descriptions for AdSense
+const categoryDescriptions = {
+    sports: "Explore a curated collection of sports videos, including classic matches, highlights, and documentaries. All videos open on Archive.org for safe viewing.",
+    sportstelevision: "Watch sports television programs, live recordings, and special coverage from Archive.org. Enjoy curated content for sports enthusiasts.",
+    tv: "Browse a selection of television shows and episodes from Archive.org. All content is publicly accessible and organized for easy viewing.",
+    movies: "Discover classic and modern movies from Archive.org. This section highlights popular films and hidden gems for movie lovers.",
+    cartoons: "Enjoy animated cartoons and short films sourced from Archive.org. Perfect for kids, fans of animation, or nostalgic viewing.",
+    anime: "Explore a curated collection of anime videos from Archive.org. Watch episodes, shorts, and classics safely in new tabs."
+};
+
 let currentCategory = "home";
 const trendingSection = document.getElementById("trending");
 const homeSection = document.getElementById("home-videos");
@@ -25,7 +35,6 @@ function createVideoCard(video) {
     const card = document.createElement("div");
     card.className = "video-card";
 
-    // Default thumbnail
     card.innerHTML = `
         <img src="${video.thumbnail}" alt="${video.title}">
         <h4>${video.title}</h4>
@@ -35,7 +44,6 @@ function createVideoCard(video) {
     const btn = card.querySelector(".stream-btn");
     btn.addEventListener("click", () => {
         if(video.rights && (video.rights.toLowerCase().includes("public domain") || video.rights.toLowerCase().includes("creative commons"))){
-            // Replace thumbnail with in-app video player
             const identifier = video.url.split('/').pop();
             card.innerHTML = `
                 <video controls width="100%" autoplay poster="${video.thumbnail}">
@@ -45,7 +53,6 @@ function createVideoCard(video) {
                 <h4>${video.title}</h4>
             `;
         } else {
-            // fallback to Archive.org
             window.open(video.url, "_blank");
         }
     });
@@ -53,7 +60,7 @@ function createVideoCard(video) {
     return card;
 }
 
-// Fetch videos with rights
+// Fetch videos
 async function fetchVideos(identifier, limit=4, page=1) {
     const url = `https://archive.org/advancedsearch.php?q=collection:${identifier}&fl[]=identifier,title,downloads,mediatype,rights&rows=${limit}&page=${page}&output=json`;
     try {
@@ -80,7 +87,7 @@ async function showTrending() {
     trendingVideos.forEach(video => trendingSection.appendChild(createVideoCard(video)));
 }
 
-// Home videos with ads
+// Home videos with descriptions and ads
 async function showHome() {
     homeSection.innerHTML = "";
     for (let cat in categories) {
@@ -88,9 +95,19 @@ async function showHome() {
         let catLinks = categories[cat];
         if(!Array.isArray(catLinks)) catLinks = [catLinks];
 
+        // Header
         const header = document.createElement("h3");
         header.textContent = cat.toUpperCase();
         homeSection.appendChild(header);
+
+        // Category description
+        if(categoryDescriptions[cat]){
+            const desc = document.createElement("p");
+            desc.style.fontSize = "0.9em";
+            desc.style.color = "#555";
+            desc.textContent = categoryDescriptions[cat];
+            homeSection.appendChild(desc);
+        }
 
         const grid = document.createElement("div");
         grid.className = "video-grid";
@@ -131,7 +148,7 @@ async function showCategory(category) {
 
     let page = 1;
     let loading = false;
-    let videoCount = 0; // Counter for ad insertion
+    let videoCount = 0;
 
     async function loadVideos() {
         if(loading) return;
@@ -165,112 +182,8 @@ async function showCategory(category) {
                 grid.appendChild(createVideoCard(v));
                 videoCount++;
 
-                // Insert AdSense after every 4 videos
                 if(videoCount % 4 === 0){
                     const ad = document.createElement("ins");
                     ad.className = "adsbygoogle";
                     ad.style.display = "block";
-                    ad.setAttribute("data-ad-client", "ca-pub-3798659133542290");
-                    ad.setAttribute("data-ad-slot", "9086965876");
-                    ad.setAttribute("data-ad-format", "auto");
-                    ad.setAttribute("data-full-width-responsive", "true");
-                    grid.appendChild(ad);
-                    (adsbygoogle = window.adsbygoogle || []).push({});
-                }
-            });
-        }
-        page++;
-        loading = false;
-    }
-
-    await loadVideos();
-
-    window.onscroll = async () => {
-        if(window.innerHeight + window.scrollY >= document.body.offsetHeight - 2) {
-            await loadVideos();
-        }
-    }
-}
-
-// Nav bar
-document.querySelectorAll(".nav-links li").forEach(li => {
-    li.addEventListener("click", async () => {
-        document.querySelectorAll(".nav-links li").forEach(x => x.classList.remove("active"));
-        li.classList.add("active");
-        currentCategory = li.dataset.category;
-        if(currentCategory === "home"){
-            categorySection.innerHTML = "";
-            await showHome();
-        } else {
-            homeSection.innerHTML = "";
-            await showCategory(currentCategory);
-        }
-    });
-});
-
-// Search form
-document.getElementById("searchForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const query = document.getElementById("searchInput").value.toLowerCase();
-    categorySection.innerHTML = "";
-
-    // Loading
-    const loading = document.createElement("p");
-    loading.textContent = "Searching...";
-    loading.style.textAlign = "center";
-    loading.style.fontWeight = "bold";
-    categorySection.appendChild(loading);
-
-    const grid = document.createElement("div");
-    grid.className = "video-grid";
-
-    try {
-        let allVideos = [];
-
-        // Hub search
-        for (const cat of categories.home) {
-            const videos = await fetchVideos(cat, 20);
-            allVideos = allVideos.concat(videos);
-        }
-
-        // Archive.org search
-        const res = await fetch(
-            `https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,year,rights&sort[]=year+desc&rows=20&page=1&output=json`
-        );
-        const data = await res.json();
-        if(data.response.docs) {
-            const archiveVideos = data.response.docs.map(v => ({
-                title: v.title,
-                url: `https://archive.org/details/${v.identifier}`,
-                rights: v.rights || "Unknown",
-                thumbnail: `https://archive.org/services/get-item-image.php?identifier=${v.identifier}&mediatype=movies&thumb=1`
-            }));
-            allVideos = allVideos.concat(archiveVideos);
-        }
-
-        // Deduplicate by title
-        const unique = {};
-        const filtered = allVideos.filter(v => {
-            const key = v.title.toLowerCase().trim();
-            if (unique[key]) return false;
-            unique[key] = true;
-            return v.title.toLowerCase().includes(query);
-        });
-
-        categorySection.innerHTML = "";
-        if(filtered.length === 0){
-            categorySection.innerHTML = `<p style="text-align:center;">No results found for "${query}"</p>`;
-        } else {
-            filtered.forEach(v => grid.appendChild(createVideoCard(v)));
-            categorySection.appendChild(grid);
-        }
-
-    } catch (err) {
-        console.error(err);
-        categorySection.innerHTML = `<p style="text-align:center; color:red;">Error fetching results</p>`;
-    }
-});
-
-// Initialize
-showTrending();
-showHome();
+                    ad.setAttribute("
