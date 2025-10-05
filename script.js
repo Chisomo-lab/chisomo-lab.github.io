@@ -15,14 +15,14 @@ const categories = {
     sportstelevision: "sportstelevision"
 };
 
-// Category descriptions for AdSense
+// Descriptions for AdSense approval
 const categoryDescriptions = {
-    sports: "Explore a curated collection of sports videos, including classic matches, highlights, and documentaries. All videos open on Archive.org for safe viewing.",
-    sportstelevision: "Watch sports television programs, live recordings, and special coverage from Archive.org. Enjoy curated content for sports enthusiasts.",
-    tv: "Browse a selection of television shows and episodes from Archive.org. All content is publicly accessible and organized for easy viewing.",
-    movies: "Discover classic and modern movies from Archive.org. This section highlights popular films and hidden gems for movie lovers.",
-    cartoons: "Enjoy animated cartoons and short films sourced from Archive.org. Perfect for kids, fans of animation, or nostalgic viewing.",
-    anime: "Explore a curated collection of anime videos from Archive.org. Watch episodes, shorts, and classics safely in new tabs."
+    sports: "Curated sports videos including classic matches and highlights. All videos open on Archive.org in new tabs.",
+    sportstelevision: "Watch sports TV programs, live recordings, and coverage. Content opens externally on Archive.org.",
+    tv: "Selection of TV shows and episodes sourced from Archive.org.",
+    movies: "Classic and modern movies curated from Archive.org. Watch safely in new tabs.",
+    cartoons: "Animated cartoons and short films sourced from Archive.org.",
+    anime: "Anime episodes and shorts curated for safe viewing via Archive.org."
 };
 
 let currentCategory = "home";
@@ -62,10 +62,9 @@ function createVideoCard(video) {
 
 // Fetch videos
 async function fetchVideos(identifier, limit=4, page=1) {
-    const url = `https://archive.org/advancedsearch.php?q=collection:${identifier}&fl[]=identifier,title,downloads,mediatype,rights&rows=${limit}&page=${page}&output=json`;
     try {
-        const response = await fetch(url);
-        const data = await response.json();
+        const res = await fetch(`https://archive.org/advancedsearch.php?q=collection:${identifier}&fl[]=identifier,title,downloads,mediatype,rights&rows=${limit}&page=${page}&output=json`);
+        const data = await res.json();
         if(!data.response.docs) return [];
 
         return data.response.docs.map(item => ({
@@ -74,7 +73,7 @@ async function fetchVideos(identifier, limit=4, page=1) {
             url: `https://archive.org/details/${item.identifier}`,
             rights: item.rights || "Unknown"
         }));
-    } catch (e) {
+    } catch(e) {
         console.error("Error fetching videos:", e);
         return [];
     }
@@ -83,12 +82,8 @@ async function fetchVideos(identifier, limit=4, page=1) {
 // Trending
 async function showTrending() {
     trendingSection.innerHTML = "";
-    try {
-        const trendingVideos = await fetchVideos(categories.home[0], 6);
-        trendingVideos.forEach(video => trendingSection.appendChild(createVideoCard(video)));
-    } catch(err) {
-        console.error("Error showing trending videos:", err);
-    }
+    const trendingVideos = await fetchVideos(categories.home[0], 6);
+    trendingVideos.forEach(video => trendingSection.appendChild(createVideoCard(video)));
 }
 
 // Home videos with descriptions and ads
@@ -106,7 +101,7 @@ async function showHome() {
         header.textContent = cat.toUpperCase();
         homeSection.appendChild(header);
 
-        // Category description (safe check)
+        // Description (safe)
         if(categoryDescriptions[cat]) {
             const desc = document.createElement("p");
             desc.style.fontSize = "0.9em";
@@ -119,8 +114,7 @@ async function showHome() {
         grid.className = "video-grid";
         homeSection.appendChild(grid);
 
-        let videoCount = 0; // Counter for ad insertion
-
+        let videoCount = 0;
         for(const link of catLinks){
             try {
                 const videos = await fetchVideos(link, 4);
@@ -128,7 +122,6 @@ async function showHome() {
                     grid.appendChild(createVideoCard(v));
                     videoCount++;
 
-                    // Insert AdSense ad every 4 videos
                     if(videoCount % 4 === 0){
                         const ad = document.createElement("ins");
                         ad.className = "adsbygoogle";
@@ -141,8 +134,8 @@ async function showHome() {
                         (adsbygoogle = window.adsbygoogle || []).push({});
                     }
                 });
-            } catch(err) {
-                console.error(`Error loading videos for ${link}:`, err);
+            } catch(err){
+                console.error(`Error loading ${link}:`, err);
             }
         }
     }
@@ -167,119 +160,125 @@ async function showCategory(category) {
 
         for(const link of catLinks){
             try {
-                let videos = await fetchVideos(link, 10, page);
+                const videos = await fetchVideos(link, 10, page);
 
                 if(category === "sports") {
-                    videos.sort((a, b) => {
-                        const yearA = parseInt((a.title.match(/\d{4}/) || [0])[0]);
-                        const yearB = parseInt((b.title.match(/\d{4}/) || [0])[0]);
-                        if(yearB !== yearA) return yearB - yearA;
+                    videos.sort((a,b)=>{
+                        const yearA = parseInt((a.title.match(/\d{4}/)||[0])[0]);
+                        const yearB = parseInt((b.title.match(/\d{4}/)||[0])[0]);
+                        if(yearB!==yearA) return yearB - yearA;
                         return a.title.localeCompare(b.title);
                     });
-                } else if(category === "sportstelevision") {
-                    videos.sort((a, b) => {
-                        const titleA = a.title.toLowerCase();
-                        const titleB = b.title.toLowerCase();
-                        const yearA = parseInt((a.title.match(/\d{4}/) || [0])[0]);
-                        const yearB = parseInt((b.title.match(/\d{4}/) || [0])[0]);
-
+                } else if(category==="sportstelevision"){
+                    videos.sort((a,b)=>{
+                        const titleA=a.title.toLowerCase(), titleB=b.title.toLowerCase();
+                        const yearA=parseInt((a.title.match(/\d{4}/)||[0])[0]);
+                        const yearB=parseInt((b.title.match(/\d{4}/)||[0])[0]);
                         if(titleA.includes("football") && !titleB.includes("football")) return -1;
                         if(!titleA.includes("football") && titleB.includes("football")) return 1;
-
-                        if(yearB !== yearA) return yearB - yearA;
+                        if(yearB!==yearA) return yearB-yearA;
                         return titleA.localeCompare(titleB);
                     });
                 }
 
-                videos.forEach(v => {
+                videos.forEach(v=>{
                     grid.appendChild(createVideoCard(v));
                     videoCount++;
 
-                    if(videoCount % 4 === 0){
+                    if(videoCount %4===0){
                         const ad = document.createElement("ins");
-                        ad.className = "adsbygoogle";
-                        ad.style.display = "block";
-                        ad.setAttribute("data-ad-client", "ca-pub-3798659133542290");
-                        ad.setAttribute("data-ad-slot", "9086965876");
-                        ad.setAttribute("data-ad-format", "auto");
-                        ad.setAttribute("data-full-width-responsive", "true");
+                        ad.className="adsbygoogle";
+                        ad.style.display="block";
+                        ad.setAttribute("data-ad-client","ca-pub-3798659133542290");
+                        ad.setAttribute("data-ad-slot","9086965876");
+                        ad.setAttribute("data-ad-format","auto");
+                        ad.setAttribute("data-full-width-responsive","true");
                         grid.appendChild(ad);
-                        (adsbygoogle = window.adsbygoogle || []).push({});
+                        (adsbygoogle=window.adsbygoogle||[]).push({});
                     }
                 });
-            } catch(err) {
-                console.error(`Error loading videos for ${link}:`, err);
+            } catch(err){
+                console.error(`Error loading ${link}:`, err);
             }
         }
 
         page++;
-        loading = false;
+        loading=false;
     }
 
     await loadVideos();
-
-    window.onscroll = async () => {
-        if(window.innerHeight + window.scrollY >= document.body.offsetHeight - 2) {
+    window.onscroll = async ()=>{
+        if(window.innerHeight + window.scrollY >= document.body.offsetHeight-2){
             await loadVideos();
         }
     }
 }
 
 // Nav bar
-document.querySelectorAll(".nav-links li").forEach(li => {
-    li.addEventListener("click", async () => {
-        document.querySelectorAll(".nav-links li").forEach(x => x.classList.remove("active"));
+document.querySelectorAll(".nav-links li").forEach(li=>{
+    li.addEventListener("click", async ()=>{
+        document.querySelectorAll(".nav-links li").forEach(x=>x.classList.remove("active"));
         li.classList.add("active");
         currentCategory = li.dataset.category;
-        if(currentCategory === "home"){
-            categorySection.innerHTML = "";
+        if(currentCategory==="home"){
+            categorySection.innerHTML="";
             await showHome();
         } else {
-            homeSection.innerHTML = "";
+            homeSection.innerHTML="";
             await showCategory(currentCategory);
         }
     });
 });
 
-// Search form
-document.getElementById("searchForm").addEventListener("submit", async (e) => {
+// Search
+document.getElementById("searchForm").addEventListener("submit", async e=>{
     e.preventDefault();
     const query = document.getElementById("searchInput").value.toLowerCase();
-    categorySection.innerHTML = "";
+    categorySection.innerHTML="<p style='text-align:center;font-weight:bold'>Searching...</p>";
 
-    const loading = document.createElement("p");
-    loading.textContent = "Searching...";
-    loading.style.textAlign = "center";
-    loading.style.fontWeight = "bold";
-    categorySection.appendChild(loading);
+    const grid=document.createElement("div");
+    grid.className="video-grid";
 
-    const grid = document.createElement("div");
-    grid.className = "video-grid";
-
-    try {
-        let allVideos = [];
-
-        for (const cat of categories.home) {
-            const videos = await fetchVideos(cat, 20);
-            allVideos = allVideos.concat(videos);
+    try{
+        let allVideos=[];
+        for(const cat of categories.home){
+            const videos=await fetchVideos(cat,20);
+            allVideos=allVideos.concat(videos);
         }
 
-        const res = await fetch(
-            `https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,year,rights&sort[]=year+desc&rows=20&page=1&output=json`
-        );
-        const data = await res.json();
-        if(data.response.docs) {
-            const archiveVideos = data.response.docs.map(v => ({
-                title: v.title,
-                url: `https://archive.org/details/${v.identifier}`,
-                rights: v.rights || "Unknown",
-                thumbnail: `https://archive.org/services/get-item-image.php?identifier=${v.identifier}&mediatype=movies&thumb=1`
+        const res=await fetch(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,year,rights&sort[]=year+desc&rows=20&page=1&output=json`);
+        const data=await res.json();
+        if(data.response.docs){
+            const archiveVideos=data.response.docs.map(v=>({
+                title:v.title,
+                url:`https://archive.org/details/${v.identifier}`,
+                rights:v.rights||"Unknown",
+                thumbnail:`https://archive.org/services/get-item-image.php?identifier=${v.identifier}&mediatype=movies&thumb=1`
             }));
-            allVideos = allVideos.concat(archiveVideos);
+            allVideos=allVideos.concat(archiveVideos);
         }
 
-        const unique = {};
-        const filtered = allVideos.filter(v => {
-            const key = v.title.toLowerCase().trim();
-            if (unique[key]) return false;
-            unique[key] = true;
+        const unique={};
+        const filtered=allVideos.filter(v=>{
+            const key=v.title.toLowerCase().trim();
+            if(unique[key]) return false;
+            unique[key]=true;
+            return v.title.toLowerCase().includes(query);
+        });
+
+        categorySection.innerHTML="";
+        if(filtered.length===0){
+            categorySection.innerHTML=`<p style="text-align:center;">No results found for "${query}"</p>`;
+        } else {
+            filtered.forEach(v=>grid.appendChild(createVideoCard(v)));
+            categorySection.appendChild(grid);
+        }
+    } catch(err){
+        console.error(err);
+        categorySection.innerHTML=`<p style="text-align:center;color:red;">Error fetching results</p>`;
+    }
+});
+
+// Initialize
+showTrending();
+showHome();
