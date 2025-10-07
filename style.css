@@ -121,6 +121,7 @@ main {
 }
 
 /* Video grid */
+
 .video-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -252,6 +253,76 @@ footer a:hover {
 /* Accordion expand */
 .video-details:not(.hidden) {
   max-height: 300px; /* adjust as needed */
+  opacity: 1;
+  padding: 1em;
+}
+.video-card {
+  background: #b71c1c; /* deep red for the card */
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  transition: transform 0.2s ease-in-out;
+  margin-bottom: 1em;
+  position: relative;
+}
+
+.video-card:hover {
+  transform: scale(1.02);
+}
+
+.video-thumb-container {
+  position: relative;
+}
+
+.video-thumb-container::after {
+  content: "▶";
+  font-size: 3em;
+  color: rgba(255,255,255,0.7);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  pointer-events: none;
+}
+
+.video-info h4 {
+  margin: 0.5em;
+  font-size: 1em;
+  color: #fff;
+}
+
+.video-details {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.3s ease;
+  padding: 0 1em;
+}
+
+.video-details p {
+  font-size: 0.9em;
+  color: #eee;
+  margin-top: 0.5em;
+}
+
+.video-details button.stream-btn {
+  background-color: #e50914; /* red button */
+  color: #fff;
+  border: none;
+  padding: 0.5em 1em;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 0.5em;
+  transition: background 0.3s ease;
+}
+
+.video-details button.stream-btn:hover {
+  background-color: #b0060f;
+}
+
+/* Accordion expand */
+.video-details:not(.hidden) {
+  max-height: 300px; /* adjust if needed */
   opacity: 1;
   padding: 1em;
 }
