@@ -172,3 +172,39 @@ footer a {
 footer a:hover {
     text-decoration: underline;
 }
+/* MovieHubPro Theme for Footer Pages */
+body.policy-page, body.terms-page, body.about-page {
+    background-color: #000;       /* Black background */
+    color: #fff;                  /* White text */
+    font-family: Arial, sans-serif;
+    line-height: 1.5;
+    padding: 0 20px;
+}
+
+body.policy-page h1, body.policy-page h2,
+body.terms-page h1, body.terms-page h2,
+body.about-page h1, body.about-page h2 {
+    color: #ff0000;               /* Red headers */
+}
+
+body.policy-page a, body.terms-page a, body.about-page a {
+    color: #ff0000;               /* Red links */
+    text-decoration: none;
+}
+
+body.policy-page a:hover,
+body.terms-page a:hover,
+body.about-page a:hover {
+    text-decoration: underline;
+}
+
+header, footer {
+    background-color: #000;
+    padding: 10px 20px;
+}
+
+footer p {
+    color: #fff;
+    font-size: 14px;
+    text-align: center;
+}
