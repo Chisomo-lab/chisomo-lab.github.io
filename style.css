@@ -197,3 +197,61 @@ footer a {
 footer a:hover {
     text-decoration: underline;
 }
+.video-card {
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease-in-out;
+  margin-bottom: 1em;
+}
+.video-card:hover {
+  transform: scale(1.02);
+}
+
+.video-thumb {
+  width: 100%;
+  cursor: pointer;
+  display: block;
+}
+
+.video-info h4 {
+  margin: 0.5em;
+  font-size: 1em;
+  color: #333;
+}
+
+.video-details {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.3s ease;
+  padding: 0 1em;
+}
+
+.video-details p {
+  font-size: 0.9em;
+  color: #555;
+  margin-top: 0.5em;
+}
+
+.video-details button.stream-btn {
+  background-color: #e50914; /* Netflix red */
+  color: #fff;
+  border: none;
+  padding: 0.5em 1em;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 0.5em;
+  transition: background 0.3s ease;
+}
+.video-details button.stream-btn:hover {
+  background-color: #b0060f;
+}
+
+/* Accordion expand */
+.video-details:not(.hidden) {
+  max-height: 300px; /* adjust as needed */
+  opacity: 1;
+  padding: 1em;
+}
