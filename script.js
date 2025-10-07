@@ -8,7 +8,6 @@ const categories = {
     sportstelevision: "sportstelevision"
 };
 
-// Descriptions for AdSense approval
 const categoryDescriptions = {
     sports: "Curated sports videos including classic matches and highlights. All videos open on Archive.org in new tabs.",
     sportstelevision: "Watch sports TV programs, live recordings, and coverage. Content opens externally on Archive.org.",
@@ -23,28 +22,31 @@ const trendingSection = document.getElementById("trending");
 const homeSection = document.getElementById("home-videos");
 const categorySection = document.getElementById("category-videos");
 
-// Toggle home/category sections
 function toggleSections(showHome=true){
     homeSection.style.display = showHome?"block":"none";
     trendingSection.style.display = showHome?"block":"none";
     categorySection.style.display = showHome?"none":"block";
 }
 
-// Extract year from title
 function extractYear(title){
     const match = title.match(/\b(19|20)\d{2}\b/);
     return match? match[0]:"";
 }
 
-// Create expandable video card (accordion)
 function createVideoCard(video){
     const card = document.createElement("div");
     card.className = "video-card";
 
+    const hours = Math.floor(video.duration / 3600);
+    const minutes = Math.floor((video.duration % 3600) / 60);
+    const durationText = hours>0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+
     card.innerHTML = `
-        <img src="${video.thumbnail}" alt="${video.title}" class="video-thumb">
+        <div class="video-thumb-container">
+            <img src="${video.thumbnail}" alt="${video.title}" class="video-thumb">
+        </div>
         <div class="video-info">
-            <h4>${video.title} ${extractYear(video.title) ? `(${extractYear(video.title)})` : ''}</h4>
+            <h4>${video.title} ${extractYear(video.title) ? `(${extractYear(video.title)})` : ''} - ${durationText}</h4>
         </div>
         <div class="video-details hidden">
             <p class="video-desc">${video.description || "No description available."}</p>
@@ -52,8 +54,7 @@ function createVideoCard(video){
         </div>
     `;
 
-    // Accordion expand/collapse: only one open at a time
-    const thumb = card.querySelector(".video-thumb");
+    const thumb = card.querySelector(".video-thumb-container");
     thumb.addEventListener("click", () => {
         const details = card.querySelector(".video-details");
         const currentlyExpanded = document.querySelectorAll(".video-details:not(.hidden)");
@@ -61,7 +62,6 @@ function createVideoCard(video){
         details.classList.toggle("hidden");
     });
 
-    // Stream button opens new tab fullscreen
     card.querySelector(".stream-btn").addEventListener("click", () => {
         const streamWindow = window.open(video.url,"_blank");
         if(streamWindow){
@@ -74,34 +74,42 @@ function createVideoCard(video){
     return card;
 }
 
-// Fetch videos
 async function fetchVideos(identifier, limit=4, page=1){
     try{
-        const res = await fetch(`https://archive.org/advancedsearch.php?q=collection:${identifier}&fl[]=identifier,title,downloads,mediatype,rights,description&rows=${limit}&page=${page}&output=json`);
+        const res = await fetch(`https://archive.org/advancedsearch.php?q=collection:${identifier}&fl[]=identifier,title,downloads,mediatype,rights,description,runtime&rows=${limit}&page=${page}&output=json`);
         const data = await res.json();
         if(!data.response.docs) return [];
 
-        return data.response.docs.map(item=>({
-            title: item.title,
-            thumbnail: `https://archive.org/services/get-item-image.php?identifier=${item.identifier}&mediatype=movies&thumb=1`,
-            url: `https://archive.org/details/${item.identifier}`,
-            rights: item.rights || "Unknown",
-            description: item.description || ""
-        }));
+        return data.response.docs.map(item=>{
+            let durationSec = 0;
+            if(item.runtime){
+                const match = item.runtime.match(/(\d+):(\d+):(\d+)/);
+                if(match){
+                    durationSec = parseInt(match[1])*3600 + parseInt(match[2])*60 + parseInt(match[3]);
+                }
+            }
+            return {
+                title: item.title,
+                thumbnail: `https://archive.org/services/get-item-image.php?identifier=${item.identifier}&mediatype=movies&thumb=1`,
+                url: `https://archive.org/details/${item.identifier}`,
+                rights: item.rights || "Unknown",
+                description: item.description || "",
+                duration: durationSec
+            };
+        });
     } catch(e){
         console.error("Error fetching videos:", e);
         return [];
     }
 }
 
-// Show trending videos
 async function showTrending(){
     trendingSection.innerHTML = "";
     const trendingVideos = await fetchVideos(categories.home[0],6);
-    trendingVideos.forEach(video=> trendingSection.appendChild(createVideoCard(video)));
+    const filteredMovies = trendingVideos.filter(v=> v.duration>=3600);
+    filteredMovies.forEach(video=> trendingSection.appendChild(createVideoCard(video)));
 }
 
-// Show home page
 async function showHome(){
     toggleSections(true);
     homeSection.innerHTML = "";
@@ -119,7 +127,7 @@ async function showHome(){
         if(categoryDescriptions[cat]){
             const desc = document.createElement("p");
             desc.style.fontSize="0.9em";
-            desc.style.color="#555";
+            desc.style.color="#eee";
             desc.textContent = categoryDescriptions[cat];
             homeSection.appendChild(desc);
         }
@@ -135,7 +143,6 @@ async function showHome(){
                 let filteredVideos = videos;
 
                 if(["movies","tv","anime"].includes(cat)){
-                    // Filter out trailers/previews/promos/etc
                     filteredVideos = videos.filter(v=>{
                         const title = v.title.toLowerCase();
                         return !(
@@ -150,7 +157,7 @@ async function showHome(){
                             title.includes("credits")
                         );
                     });
-                    // Sort by year descending
+                    if(cat==="movies") filteredVideos = filteredVideos.filter(v=>v.duration>=3600);
                     filteredVideos.sort((a,b)=>{
                         const yearA=parseInt((a.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
                         const yearB=parseInt((b.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
@@ -181,7 +188,6 @@ async function showHome(){
     }
 }
 
-// Show category with infinite scroll
 async function showCategory(category){
     toggleSections(false);
     categorySection.innerHTML = "";
@@ -220,6 +226,7 @@ async function showCategory(category){
                             title.includes("credits")
                         );
                     });
+                    if(category==="movies") filteredVideos = filteredVideos.filter(v=>v.duration>=3600);
                     filteredVideos.sort((a,b)=>{
                         const yearA=parseInt((a.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
                         const yearB=parseInt((b.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
@@ -230,7 +237,6 @@ async function showCategory(category){
                     });
                 }
 
-                // Sports sorting
                 else if(category==="sports"){
                     filteredVideos.sort((a,b)=>{
                         const yearA=parseInt((a.title.match(/\d{4}/)||[0])[0]);
@@ -240,7 +246,6 @@ async function showCategory(category){
                     });
                 }
 
-                // Sportstelevision sorting
                 else if(category==="sportstelevision"){
                     filteredVideos.sort((a,b)=>{
                         const titleA=a.title.toLowerCase(), titleB=b.title.toLowerCase();
@@ -282,7 +287,7 @@ async function showCategory(category){
     };
 }
 
-// Nav bar click
+// Nav click
 document.querySelectorAll(".nav-links li").forEach(li=>{
     li.addEventListener("click", async()=>{
         document.querySelectorAll(".nav-links li").forEach(x=>x.classList.remove("active"));
@@ -313,7 +318,7 @@ document.getElementById("searchForm").addEventListener("submit", async e=>{
             allVideos=allVideos.concat(videos);
         }
 
-        const res=await fetch(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,year,rights,description&sort[]=year+desc&rows=20&page=1&output=json`);
+        const res=await fetch(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,year,rights,description,runtime&sort[]=year+desc&rows=20&page=1&output=json`);
         const data=await res.json();
         if(data.response.docs){
             const archiveVideos=data.response.docs.map(v=>({
@@ -321,7 +326,8 @@ document.getElementById("searchForm").addEventListener("submit", async e=>{
                 url:`https://archive.org/details/${v.identifier}`,
                 rights:v.rights||"Unknown",
                 thumbnail:`https://archive.org/services/get-item-image.php?identifier=${v.identifier}&mediatype=movies&thumb=1`,
-                description:v.description||""
+                description:v.description||"",
+                duration: 3600 // default 1h+
             }));
             allVideos=allVideos.concat(archiveVideos);
         }
