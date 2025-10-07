@@ -22,15 +22,9 @@ const trendingSection = document.getElementById("trending");
 const homeSection = document.getElementById("home-videos");
 const categorySection = document.getElementById("category-videos");
 
-function toggleSections(showHome=true){
-    homeSection.style.display = showHome?"block":"none";
-    trendingSection.style.display = showHome?"block":"none";
-    categorySection.style.display = showHome?"none":"block";
-}
-
 function extractYear(title){
     const match = title.match(/\b(19|20)\d{2}\b/);
-    return match? match[0]:"";
+    return match ? match[0] : "";
 }
 
 function createVideoCard(video){
@@ -44,31 +38,14 @@ function createVideoCard(video){
     card.innerHTML = `
         <div class="video-thumb-container">
             <img src="${video.thumbnail}" alt="${video.title}" class="video-thumb">
+            <div class="play-symbol">▶</div>
         </div>
-        <div class="video-info">
-            <h4>${video.title} ${extractYear(video.title) ? `(${extractYear(video.title)})` : ''} - ${durationText}</h4>
-        </div>
-        <div class="video-details hidden">
-            <p class="video-desc">${video.description || "No description available."}</p>
-            <button class="stream-btn">Watch</button>
-        </div>
+        <h4>${video.title} ${extractYear(video.title) ? `(${extractYear(video.title)})` : ""} - ${durationText}</h4>
+        <button class="stream-btn">Watch</button>
     `;
 
-    const thumb = card.querySelector(".video-thumb-container");
-    thumb.addEventListener("click", () => {
-        const details = card.querySelector(".video-details");
-        const currentlyExpanded = document.querySelectorAll(".video-details:not(.hidden)");
-        currentlyExpanded.forEach(d => { if(d !== details) d.classList.add("hidden"); });
-        details.classList.toggle("hidden");
-    });
-
     card.querySelector(".stream-btn").addEventListener("click", () => {
-        const streamWindow = window.open(video.url,"_blank");
-        if(streamWindow){
-            streamWindow.document.addEventListener("DOMContentLoaded", ()=>{
-                streamWindow.document.body.requestFullscreen?.();
-            });
-        }
+        window.open(video.url, "_blank");
     });
 
     return card;
@@ -103,17 +80,19 @@ async function fetchVideos(identifier, limit=4, page=1){
     }
 }
 
+// Show trending
 async function showTrending(){
     trendingSection.innerHTML = "";
-    const trendingVideos = await fetchVideos(categories.home[0],6);
-    const filteredMovies = trendingVideos.filter(v=> v.duration>=3600);
-    filteredMovies.forEach(video=> trendingSection.appendChild(createVideoCard(video)));
+    const trendingVideos = await fetchVideos(categories.home[0], 6);
+    const filteredMovies = trendingVideos.filter(v => v.duration >= 3600);
+    filteredMovies.forEach(video => trendingSection.appendChild(createVideoCard(video)));
 }
 
+// Show home
 async function showHome(){
-    toggleSections(true);
     homeSection.innerHTML = "";
-
+    categorySection.innerHTML = "";
+    
     for(let cat in categories){
         if(cat==="home") continue;
 
@@ -139,40 +118,35 @@ async function showHome(){
         let videoCount = 0;
         for(const link of catLinks){
             try{
-                const videos = await fetchVideos(link,4);
+                const videos = await fetchVideos(link, 4);
                 let filteredVideos = videos;
 
-                if(["movies","tv","anime"].includes(cat)){
+                if(cat==="movies"){
                     filteredVideos = videos.filter(v=>{
                         const title = v.title.toLowerCase();
                         return !(
-                            title.includes("trailer")||
-                            title.includes("teaser")||
-                            title.includes("promo")||
-                            title.includes("preview")||
-                            title.includes("bts")||
-                            title.includes("behind the scenes")||
-                            title.includes("intro")||
-                            title.includes("opening")||
-                            title.includes("credits")
+                            title.includes("trailer") || 
+                            title.includes("teaser") || 
+                            title.includes("preview") || 
+                            title.includes("promo")
                         );
                     });
-                    if(cat==="movies") filteredVideos = filteredVideos.filter(v=>v.duration>=3600);
+                    filteredVideos = filteredVideos.filter(v => v.duration >= 3600);
                     filteredVideos.sort((a,b)=>{
-                        const yearA=parseInt((a.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
-                        const yearB=parseInt((b.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
+                        const yearA = parseInt((a.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
+                        const yearB = parseInt((b.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
                         if(!yearA && !yearB) return a.title.localeCompare(b.title);
                         if(!yearA) return 1;
                         if(!yearB) return -1;
-                        return yearB-yearA;
+                        return yearB - yearA;
                     });
                 }
 
                 filteredVideos.forEach(v=>{
                     grid.appendChild(createVideoCard(v));
                     videoCount++;
-                    if(videoCount%4===0){
-                        const ad=document.createElement("ins");
+                    if(videoCount % 4 === 0){
+                        const ad = document.createElement("ins");
                         ad.className="adsbygoogle";
                         ad.style.display="block";
                         ad.setAttribute("data-ad-client","ca-pub-3798659133542290");
@@ -183,14 +157,17 @@ async function showHome(){
                         (adsbygoogle=window.adsbygoogle||[]).push({});
                     }
                 });
-            } catch(err){ console.error(`Error loading ${link}:`,err); }
+            } catch(err){
+                console.error(`Error loading ${link}:`, err);
+            }
         }
     }
 }
 
+// Show category
 async function showCategory(category){
-    toggleSections(false);
     categorySection.innerHTML = "";
+    homeSection.innerHTML = "";
     let catLinks = categories[category];
     if(!Array.isArray(catLinks)) catLinks = [catLinks];
 
@@ -204,65 +181,39 @@ async function showCategory(category){
 
     async function loadVideos(){
         if(loading) return;
-        loading=true;
+        loading = true;
 
         for(const link of catLinks){
             try{
-                const videos = await fetchVideos(link,10,page);
+                const videos = await fetchVideos(link, 10, page);
                 let filteredVideos = videos;
 
-                if(["movies","tv","anime"].includes(category)){
+                if(category==="movies"){
                     filteredVideos = videos.filter(v=>{
                         const title = v.title.toLowerCase();
                         return !(
-                            title.includes("trailer")||
-                            title.includes("teaser")||
-                            title.includes("promo")||
-                            title.includes("preview")||
-                            title.includes("bts")||
-                            title.includes("behind the scenes")||
-                            title.includes("intro")||
-                            title.includes("opening")||
-                            title.includes("credits")
+                            title.includes("trailer") || 
+                            title.includes("teaser") || 
+                            title.includes("preview") || 
+                            title.includes("promo")
                         );
                     });
-                    if(category==="movies") filteredVideos = filteredVideos.filter(v=>v.duration>=3600);
+                    filteredVideos = filteredVideos.filter(v => v.duration >= 3600);
                     filteredVideos.sort((a,b)=>{
-                        const yearA=parseInt((a.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
-                        const yearB=parseInt((b.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
+                        const yearA = parseInt((a.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
+                        const yearB = parseInt((b.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
                         if(!yearA && !yearB) return a.title.localeCompare(b.title);
                         if(!yearA) return 1;
                         if(!yearB) return -1;
-                        return yearB-yearA;
-                    });
-                }
-
-                else if(category==="sports"){
-                    filteredVideos.sort((a,b)=>{
-                        const yearA=parseInt((a.title.match(/\d{4}/)||[0])[0]);
-                        const yearB=parseInt((b.title.match(/\d{4}/)||[0])[0]);
-                        if(yearB!==yearA) return yearB-yearA;
-                        return a.title.localeCompare(b.title);
-                    });
-                }
-
-                else if(category==="sportstelevision"){
-                    filteredVideos.sort((a,b)=>{
-                        const titleA=a.title.toLowerCase(), titleB=b.title.toLowerCase();
-                        const yearA=parseInt((a.title.match(/\d{4}/)||[0])[0]);
-                        const yearB=parseInt((b.title.match(/\d{4}/)||[0])[0]);
-                        if(titleA.includes("football") && !titleB.includes("football")) return -1;
-                        if(!titleA.includes("football") && titleB.includes("football")) return 1;
-                        if(yearB!==yearA) return yearB-yearA;
-                        return titleA.localeCompare(titleB);
+                        return yearB - yearA;
                     });
                 }
 
                 filteredVideos.forEach(v=>{
                     grid.appendChild(createVideoCard(v));
                     videoCount++;
-                    if(videoCount%4===0){
-                        const ad=document.createElement("ins");
+                    if(videoCount % 4 === 0){
+                        const ad = document.createElement("ins");
                         ad.className="adsbygoogle";
                         ad.style.display="block";
                         ad.setAttribute("data-ad-client","ca-pub-3798659133542290");
@@ -273,13 +224,15 @@ async function showCategory(category){
                         (adsbygoogle=window.adsbygoogle||[]).push({});
                     }
                 });
-            } catch(err){ console.error(`Error loading ${link}:`,err); }
+            } catch(err){ console.error(`Error loading ${link}:`, err); }
         }
+
         page++;
         loading=false;
     }
 
     await loadVideos();
+
     window.onscroll = async()=>{
         if(window.innerHeight + window.scrollY >= document.body.offsetHeight-2){
             await loadVideos();
@@ -287,7 +240,7 @@ async function showCategory(category){
     };
 }
 
-// Nav click
+// Nav clicks
 document.querySelectorAll(".nav-links li").forEach(li=>{
     li.addEventListener("click", async()=>{
         document.querySelectorAll(".nav-links li").forEach(x=>x.classList.remove("active"));
@@ -304,7 +257,6 @@ document.querySelectorAll(".nav-links li").forEach(li=>{
 // Search
 document.getElementById("searchForm").addEventListener("submit", async e=>{
     e.preventDefault();
-    toggleSections(false);
     const query = document.getElementById("searchInput").value.toLowerCase();
     categorySection.innerHTML="<p style='text-align:center;font-weight:bold'>Searching...</p>";
 
@@ -327,7 +279,7 @@ document.getElementById("searchForm").addEventListener("submit", async e=>{
                 rights:v.rights||"Unknown",
                 thumbnail:`https://archive.org/services/get-item-image.php?identifier=${v.identifier}&mediatype=movies&thumb=1`,
                 description:v.description||"",
-                duration: 3600 // default 1h+
+                duration: 3600
             }));
             allVideos=allVideos.concat(archiveVideos);
         }
