@@ -1,17 +1,10 @@
 const categories = {
-    home: [
-        "sports",
-        "tv",
-        "movies",
-        "cartoons",
-        "anime",
-        "sportstelevision"
-    ],
+    home: ["sports","tv","movies","cartoons","anime","sportstelevision"],
     sports: "sports",
     tv: "television_inbox",
     movies: "moviesandfilms",
-    cartoons: ["animation_unsorted", "more_animation"],
-    anime: ["anime", "anime_miscellaneous"],
+    cartoons: ["animation_unsorted","more_animation"],
+    anime: ["anime","anime_miscellaneous"],
     sportstelevision: "sportstelevision"
 };
 
@@ -30,30 +23,51 @@ const trendingSection = document.getElementById("trending");
 const homeSection = document.getElementById("home-videos");
 const categorySection = document.getElementById("category-videos");
 
-// Create video card
-function createVideoCard(video) {
+// Toggle home/category sections
+function toggleSections(showHome=true){
+    homeSection.style.display = showHome?"block":"none";
+    trendingSection.style.display = showHome?"block":"none";
+    categorySection.style.display = showHome?"none":"block";
+}
+
+// Extract year from title
+function extractYear(title){
+    const match = title.match(/\b(19|20)\d{2}\b/);
+    return match? match[0]:"";
+}
+
+// Create expandable video card (accordion)
+function createVideoCard(video){
     const card = document.createElement("div");
     card.className = "video-card";
 
     card.innerHTML = `
-        <img src="${video.thumbnail}" alt="${video.title}">
-        <h4>${video.title}</h4>
-        <button class="stream-btn">▶ Stream</button>
+        <img src="${video.thumbnail}" alt="${video.title}" class="video-thumb">
+        <div class="video-info">
+            <h4>${video.title} ${extractYear(video.title) ? `(${extractYear(video.title)})` : ''}</h4>
+        </div>
+        <div class="video-details hidden">
+            <p class="video-desc">${video.description || "No description available."}</p>
+            <button class="stream-btn">Watch</button>
+        </div>
     `;
 
-    const btn = card.querySelector(".stream-btn");
-    btn.addEventListener("click", () => {
-        if(video.rights && (video.rights.toLowerCase().includes("public domain") || video.rights.toLowerCase().includes("creative commons"))){
-            const identifier = video.url.split('/').pop();
-            card.innerHTML = `
-                <video controls width="100%" autoplay poster="${video.thumbnail}">
-                    <source src="https://archive.org/download/${identifier}/${identifier}.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-                <h4>${video.title}</h4>
-            `;
-        } else {
-            window.open(video.url, "_blank");
+    // Accordion expand/collapse: only one open at a time
+    const thumb = card.querySelector(".video-thumb");
+    thumb.addEventListener("click", () => {
+        const details = card.querySelector(".video-details");
+        const currentlyExpanded = document.querySelectorAll(".video-details:not(.hidden)");
+        currentlyExpanded.forEach(d => { if(d !== details) d.classList.add("hidden"); });
+        details.classList.toggle("hidden");
+    });
+
+    // Stream button opens new tab fullscreen
+    card.querySelector(".stream-btn").addEventListener("click", () => {
+        const streamWindow = window.open(video.url,"_blank");
+        if(streamWindow){
+            streamWindow.document.addEventListener("DOMContentLoaded", ()=>{
+                streamWindow.document.body.requestFullscreen?.();
+            });
         }
     });
 
@@ -61,132 +75,97 @@ function createVideoCard(video) {
 }
 
 // Fetch videos
-async function fetchVideos(identifier, limit=4, page=1) {
-    try {
-        const res = await fetch(`https://archive.org/advancedsearch.php?q=collection:${identifier}&fl[]=identifier,title,downloads,mediatype,rights&rows=${limit}&page=${page}&output=json`);
+async function fetchVideos(identifier, limit=4, page=1){
+    try{
+        const res = await fetch(`https://archive.org/advancedsearch.php?q=collection:${identifier}&fl[]=identifier,title,downloads,mediatype,rights,description&rows=${limit}&page=${page}&output=json`);
         const data = await res.json();
         if(!data.response.docs) return [];
 
-        return data.response.docs.map(item => ({
+        return data.response.docs.map(item=>({
             title: item.title,
             thumbnail: `https://archive.org/services/get-item-image.php?identifier=${item.identifier}&mediatype=movies&thumb=1`,
             url: `https://archive.org/details/${item.identifier}`,
-            rights: item.rights || "Unknown"
+            rights: item.rights || "Unknown",
+            description: item.description || ""
         }));
-    } catch(e) {
+    } catch(e){
         console.error("Error fetching videos:", e);
         return [];
     }
 }
 
-// Trending
-async function showTrending() {
+// Show trending videos
+async function showTrending(){
     trendingSection.innerHTML = "";
-    const trendingVideos = await fetchVideos(categories.home[0], 6);
-    trendingVideos.forEach(video => trendingSection.appendChild(createVideoCard(video)));
+    const trendingVideos = await fetchVideos(categories.home[0],6);
+    trendingVideos.forEach(video=> trendingSection.appendChild(createVideoCard(video)));
 }
 
-// Home videos with descriptions and ads
-async function showHome() {
+// Show home page
+async function showHome(){
+    toggleSections(true);
     homeSection.innerHTML = "";
 
-    for (let cat in categories) {
-        if(cat === "home") continue;
+    for(let cat in categories){
+        if(cat==="home") continue;
 
         let catLinks = categories[cat];
         if(!Array.isArray(catLinks)) catLinks = [catLinks];
 
-        // Header
         const header = document.createElement("h3");
         header.textContent = cat.toUpperCase();
         homeSection.appendChild(header);
 
-        // Description (safe)
-        if(categoryDescriptions[cat]) {
+        if(categoryDescriptions[cat]){
             const desc = document.createElement("p");
-            desc.style.fontSize = "0.9em";
-            desc.style.color = "#555";
+            desc.style.fontSize="0.9em";
+            desc.style.color="#555";
             desc.textContent = categoryDescriptions[cat];
             homeSection.appendChild(desc);
         }
 
         const grid = document.createElement("div");
-        grid.className = "video-grid";
+        grid.className="video-grid";
         homeSection.appendChild(grid);
 
         let videoCount = 0;
         for(const link of catLinks){
-            try {
-                const videos = await fetchVideos(link, 4);
-                videos.forEach(v => {
-                    grid.appendChild(createVideoCard(v));
-                    videoCount++;
+            try{
+                const videos = await fetchVideos(link,4);
+                let filteredVideos = videos;
 
-                    if(videoCount % 4 === 0){
-                        const ad = document.createElement("ins");
-                        ad.className = "adsbygoogle";
-                        ad.style.display = "block";
-                        ad.setAttribute("data-ad-client", "ca-pub-3798659133542290");
-                        ad.setAttribute("data-ad-slot", "9086965876");
-                        ad.setAttribute("data-ad-format", "auto");
-                        ad.setAttribute("data-full-width-responsive", "true");
-                        grid.appendChild(ad);
-                        (adsbygoogle = window.adsbygoogle || []).push({});
-                    }
-                });
-            } catch(err){
-                console.error(`Error loading ${link}:`, err);
-            }
-        }
-    }
-}
-
-// Category view with infinite scroll and ads
-async function showCategory(category) {
-    categorySection.innerHTML = "";
-    let catLinks = categories[category];
-    if(!Array.isArray(catLinks)) catLinks = [catLinks];
-    const grid = document.createElement("div");
-    grid.className = "video-grid";
-    categorySection.appendChild(grid);
-
-    let page = 1;
-    let loading = false;
-    let videoCount = 0;
-
-    async function loadVideos() {
-        if(loading) return;
-        loading = true;
-
-        for(const link of catLinks){
-            try {
-                const videos = await fetchVideos(link, 10, page);
-
-                if(category === "sports") {
-                    videos.sort((a,b)=>{
-                        const yearA = parseInt((a.title.match(/\d{4}/)||[0])[0]);
-                        const yearB = parseInt((b.title.match(/\d{4}/)||[0])[0]);
-                        if(yearB!==yearA) return yearB - yearA;
-                        return a.title.localeCompare(b.title);
+                if(["movies","tv","anime"].includes(cat)){
+                    // Filter out trailers/previews/promos/etc
+                    filteredVideos = videos.filter(v=>{
+                        const title = v.title.toLowerCase();
+                        return !(
+                            title.includes("trailer")||
+                            title.includes("teaser")||
+                            title.includes("promo")||
+                            title.includes("preview")||
+                            title.includes("bts")||
+                            title.includes("behind the scenes")||
+                            title.includes("intro")||
+                            title.includes("opening")||
+                            title.includes("credits")
+                        );
                     });
-                } else if(category==="sportstelevision"){
-                    videos.sort((a,b)=>{
-                        const titleA=a.title.toLowerCase(), titleB=b.title.toLowerCase();
-                        const yearA=parseInt((a.title.match(/\d{4}/)||[0])[0]);
-                        const yearB=parseInt((b.title.match(/\d{4}/)||[0])[0]);
-                        if(titleA.includes("football") && !titleB.includes("football")) return -1;
-                        if(!titleA.includes("football") && titleB.includes("football")) return 1;
-                        if(yearB!==yearA) return yearB-yearA;
-                        return titleA.localeCompare(titleB);
+                    // Sort by year descending
+                    filteredVideos.sort((a,b)=>{
+                        const yearA=parseInt((a.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
+                        const yearB=parseInt((b.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
+                        if(!yearA && !yearB) return a.title.localeCompare(b.title);
+                        if(!yearA) return 1;
+                        if(!yearB) return -1;
+                        return yearB-yearA;
                     });
                 }
 
-                videos.forEach(v=>{
+                filteredVideos.forEach(v=>{
                     grid.appendChild(createVideoCard(v));
                     videoCount++;
-
-                    if(videoCount %4===0){
-                        const ad = document.createElement("ins");
+                    if(videoCount%4===0){
+                        const ad=document.createElement("ins");
                         ad.className="adsbygoogle";
                         ad.style.display="block";
                         ad.setAttribute("data-ad-client","ca-pub-3798659133542290");
@@ -197,34 +176,121 @@ async function showCategory(category) {
                         (adsbygoogle=window.adsbygoogle||[]).push({});
                     }
                 });
-            } catch(err){
-                console.error(`Error loading ${link}:`, err);
-            }
+            } catch(err){ console.error(`Error loading ${link}:`,err); }
         }
+    }
+}
 
+// Show category with infinite scroll
+async function showCategory(category){
+    toggleSections(false);
+    categorySection.innerHTML = "";
+    let catLinks = categories[category];
+    if(!Array.isArray(catLinks)) catLinks = [catLinks];
+
+    const grid = document.createElement("div");
+    grid.className="video-grid";
+    categorySection.appendChild(grid);
+
+    let page=1;
+    let loading=false;
+    let videoCount=0;
+
+    async function loadVideos(){
+        if(loading) return;
+        loading=true;
+
+        for(const link of catLinks){
+            try{
+                const videos = await fetchVideos(link,10,page);
+                let filteredVideos = videos;
+
+                if(["movies","tv","anime"].includes(category)){
+                    filteredVideos = videos.filter(v=>{
+                        const title = v.title.toLowerCase();
+                        return !(
+                            title.includes("trailer")||
+                            title.includes("teaser")||
+                            title.includes("promo")||
+                            title.includes("preview")||
+                            title.includes("bts")||
+                            title.includes("behind the scenes")||
+                            title.includes("intro")||
+                            title.includes("opening")||
+                            title.includes("credits")
+                        );
+                    });
+                    filteredVideos.sort((a,b)=>{
+                        const yearA=parseInt((a.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
+                        const yearB=parseInt((b.title.match(/\b(19|20)\d{2}\b/)||[0])[0]);
+                        if(!yearA && !yearB) return a.title.localeCompare(b.title);
+                        if(!yearA) return 1;
+                        if(!yearB) return -1;
+                        return yearB-yearA;
+                    });
+                }
+
+                // Sports sorting
+                else if(category==="sports"){
+                    filteredVideos.sort((a,b)=>{
+                        const yearA=parseInt((a.title.match(/\d{4}/)||[0])[0]);
+                        const yearB=parseInt((b.title.match(/\d{4}/)||[0])[0]);
+                        if(yearB!==yearA) return yearB-yearA;
+                        return a.title.localeCompare(b.title);
+                    });
+                }
+
+                // Sportstelevision sorting
+                else if(category==="sportstelevision"){
+                    filteredVideos.sort((a,b)=>{
+                        const titleA=a.title.toLowerCase(), titleB=b.title.toLowerCase();
+                        const yearA=parseInt((a.title.match(/\d{4}/)||[0])[0]);
+                        const yearB=parseInt((b.title.match(/\d{4}/)||[0])[0]);
+                        if(titleA.includes("football") && !titleB.includes("football")) return -1;
+                        if(!titleA.includes("football") && titleB.includes("football")) return 1;
+                        if(yearB!==yearA) return yearB-yearA;
+                        return titleA.localeCompare(titleB);
+                    });
+                }
+
+                filteredVideos.forEach(v=>{
+                    grid.appendChild(createVideoCard(v));
+                    videoCount++;
+                    if(videoCount%4===0){
+                        const ad=document.createElement("ins");
+                        ad.className="adsbygoogle";
+                        ad.style.display="block";
+                        ad.setAttribute("data-ad-client","ca-pub-3798659133542290");
+                        ad.setAttribute("data-ad-slot","9086965876");
+                        ad.setAttribute("data-ad-format","auto");
+                        ad.setAttribute("data-full-width-responsive","true");
+                        grid.appendChild(ad);
+                        (adsbygoogle=window.adsbygoogle||[]).push({});
+                    }
+                });
+            } catch(err){ console.error(`Error loading ${link}:`,err); }
+        }
         page++;
         loading=false;
     }
 
     await loadVideos();
-    window.onscroll = async ()=>{
+    window.onscroll = async()=>{
         if(window.innerHeight + window.scrollY >= document.body.offsetHeight-2){
             await loadVideos();
         }
-    }
+    };
 }
 
-// Nav bar
+// Nav bar click
 document.querySelectorAll(".nav-links li").forEach(li=>{
-    li.addEventListener("click", async ()=>{
+    li.addEventListener("click", async()=>{
         document.querySelectorAll(".nav-links li").forEach(x=>x.classList.remove("active"));
         li.classList.add("active");
         currentCategory = li.dataset.category;
         if(currentCategory==="home"){
-            categorySection.innerHTML="";
             await showHome();
         } else {
-            homeSection.innerHTML="";
             await showCategory(currentCategory);
         }
     });
@@ -233,6 +299,7 @@ document.querySelectorAll(".nav-links li").forEach(li=>{
 // Search
 document.getElementById("searchForm").addEventListener("submit", async e=>{
     e.preventDefault();
+    toggleSections(false);
     const query = document.getElementById("searchInput").value.toLowerCase();
     categorySection.innerHTML="<p style='text-align:center;font-weight:bold'>Searching...</p>";
 
@@ -246,14 +313,15 @@ document.getElementById("searchForm").addEventListener("submit", async e=>{
             allVideos=allVideos.concat(videos);
         }
 
-        const res=await fetch(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,year,rights&sort[]=year+desc&rows=20&page=1&output=json`);
+        const res=await fetch(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,year,rights,description&sort[]=year+desc&rows=20&page=1&output=json`);
         const data=await res.json();
         if(data.response.docs){
             const archiveVideos=data.response.docs.map(v=>({
                 title:v.title,
                 url:`https://archive.org/details/${v.identifier}`,
                 rights:v.rights||"Unknown",
-                thumbnail:`https://archive.org/services/get-item-image.php?identifier=${v.identifier}&mediatype=movies&thumb=1`
+                thumbnail:`https://archive.org/services/get-item-image.php?identifier=${v.identifier}&mediatype=movies&thumb=1`,
+                description:v.description||""
             }));
             allVideos=allVideos.concat(archiveVideos);
         }
