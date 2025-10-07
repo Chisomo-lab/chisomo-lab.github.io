@@ -142,3 +142,79 @@ main {
     flex: 0 0 auto;
     width: 140px;  /* smaller size */
 }
+.video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    padding: 10px 0;
+}
+
+/* Special smaller size for Anime category */
+.video-grid.anime .video-card {
+    max-width: 120px;
+}
+
+.video-grid.anime .video-card img {
+    height: 100px;
+    object-fit: cover;
+}
+
+/* Video card styling */
+.video-card {
+    background: #111;
+    padding: 5px;
+    border-radius: 5px;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.video-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 0 10px #ff0000;
+}
+
+.video-card img, .video-card video {
+    width: 100%;
+    border-radius: 5px;
+    object-fit: cover;
+}
+
+.video-card h4 {
+    font-size: 14px;
+    margin: 5px 0;
+    color: #fff;
+}
+
+.video-card button {
+    margin: 2px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    background: red;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    transition: background 0.3s;
+}
+
+.video-card button:hover {
+    background: darkred;
+}
+
+/* Footer */
+footer {
+    padding: 10px;
+    text-align: center;
+    background: #111;
+    font-size: 12px;
+    color: #aaa;
+}
+
+footer a {
+    color: red;
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
